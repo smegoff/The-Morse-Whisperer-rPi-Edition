@@ -1,0 +1,49 @@
+{
+  "sample_rate": 8000,
+  "block_n": 64,
+  "target_tone_hz": 700.0,
+  "allowed_tones_hz": [
+    400.0,
+    500.0,
+    550.0,
+    600.0,
+    650.0,
+    700.0,
+    750.0,
+    800.0,
+    850.0,
+    900.0,
+    950.0,
+    1000.0
+  ],
+  "sensitivity": 0.85,
+  "squelch_snr": 2.5,
+  "audio_queue_blocks": 14,
+  "preferred_usb_ids": [
+    {
+      "vid": "046d",
+      "pid": "081d"
+    },
+    {
+      "vid": "0d8c",
+      "pid": "0014"
+    }
+  ],
+  "display": {
+    "enabled": true,
+    "framebuffer_candidates": [
+      "/dev/fb1",
+      "/dev/fb0"
+    ],
+    "fps": 8,
+    "font_size": 16
+  },
+  "console": {
+    "enabled": true,
+    "status_interval_sec": 1.0
+  },
+  "training_enabled": false,
+  "decode_delay_ms": 1500,
+  "tone_scan_history_sec": 3.0,
+  "prelock_replay_ms": 340
+}
