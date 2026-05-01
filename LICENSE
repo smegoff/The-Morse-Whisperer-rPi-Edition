@@ -1,3 +1,7 @@
+# The Morse Whisperer rPi Edition
+# Copyright (c) 2026 Sean Glasspool
+# Released under the MIT Licence. See LICENSE for details.
+
 MIT License
 
 Copyright (c) 2026 Sean Glasspool
@@ -19,3 +23,9 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Licence
+
+The Morse Whisperer rPi Edition is released as free and open-source software under the MIT Licence.
+
+See [LICENSE](LICENSE) for details.
