@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+
+# Runtime / appliance state
+reports/
+*.wav
+*.raw
+*.log
+/run/
+
+# Local config and backups
+config.local.json
+*.bak
+patch-backups/
+good-snapshots/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
