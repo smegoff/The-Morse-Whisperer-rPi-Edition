@@ -42,6 +42,8 @@
   "show_rejected_candidates": false,
   "session_auto_min_ratio": 4.0,
   "session_auto_min_snr": 8.0,
+  "char_gap_units": 2.25,
+  "word_gap_units": 5.8,
   "buttons_enabled": false,
   "button_sidecar_enabled": true,
   "tft_default_page": "COPY",
