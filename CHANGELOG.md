@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-05-08 - Slow CW and Honest COPY Milestone
+
+### Added
+
+- Slow CW timing estimator improvements for low-speed Morse, including 5 WPM testing.
+- Longer slow-CW live session defaults in `config.example.json`:
+  - `audio_queue_seconds`: 60
+  - `live_session_max_sec`: 180
+  - `live_end_silence_sec`: 5.0
+  - `max_events_in_snapshot`: 160
+
+### Changed
+
+- COPY formatting is now deliberately honest and non-semantic.
+- `formatter.py` now only normalises whitespace and uppercases display text.
+- Removed context-style cleanup from COPY formatting, including callsign repair, preamble stripping, and phrase/number repair.
+
+### Fixed / Learned
+
+- Fixed the 5 WPM failure mode where slow dits were being treated as dahs, producing repeated `T` characters.
+- Confirmed that spacing issues should be fixed in decoder timing and gap classification, not hidden by post-processing.
+
+### Current Known Good State
+
+- 700 Hz lock working.
+- 5 WPM decoding working acceptably.
+- No formatter cheating.
+- Web UI running.
+- TFT running.
+- Four-button GPIO sidecar running.
+- Safe splash v2 working.
+
 ## 2026-05-07 - Raspberry Pi 4 Appliance Milestone
 
 ### Added
