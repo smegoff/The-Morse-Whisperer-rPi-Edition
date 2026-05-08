@@ -81,7 +81,7 @@ def _as_float_audio(samples: np.ndarray) -> np.ndarray:
 def audio_metrics(samples: np.ndarray) -> AudioMetrics:
     x = _as_float_audio(samples)
     if x.size == 0:
-        return AudioMetrics(0.0, 0.0, 0.0, 0.0, "IDLE")
+        return AudioMetrics(0.0, 0.0, 0.0, "IDLE")
     peak = float(np.max(np.abs(x)))
     rms = float(np.sqrt(np.mean(x * x)))
     clip = float(np.mean(np.abs(x) >= 0.985) * 100.0)
@@ -104,7 +104,6 @@ def tone_power(samples: np.ndarray, sample_rate: int, tone_hz: float) -> float:
         return 0.0
     x = x - float(np.mean(x))
     n = x.size
-    # Correlation at exact tone. Normalised enough for ranking and diagnostics.
     t = np.arange(n, dtype=np.float32) / float(sample_rate)
     win = np.hanning(n).astype(np.float32) if n > 8 else np.ones(n, dtype=np.float32)
     xw = x * win
@@ -140,7 +139,6 @@ def frame_envelope(samples: np.ndarray, sample_rate: int, tone_hz: int, window_m
         s = float(np.dot(seg, sinv))
         env[i] = math.sqrt(c*c + s*s) / norm
         times[i] = (start + win_n / 2.0) * 1000.0 / float(sample_rate)
-    # Mild smoothing, enough to suppress chatter but not smear 12 ms too badly.
     if env.size >= 3:
         env = np.convolve(env, np.array([0.25, 0.5, 0.25], dtype=np.float32), mode="same")
     return env, times
@@ -186,7 +184,6 @@ def schmitt_events(env: np.ndarray, times_ms: np.ndarray, threshold_bias: float,
     return events, threshold, low_th, high_th
 
 def compensate_events(events: List[Event], comp_ms: float) -> List[Event]:
-    # Positive comp shrinks marks / expands spaces; negative does the reverse. Useful for ringing tests.
     out: List[Event] = []
     for e in events:
         ms = e.ms - comp_ms if e.kind == "mark" else e.ms + comp_ms
@@ -219,33 +216,20 @@ def merge_tiny_glitches(events: List[Event], min_ms: float) -> List[Event]:
 
 
 def clean_events_by_dot(events: List[Event], dot_ms: float, fraction: float = 0.45) -> List[Event]:
-    """
-    Remove tiny mark/space chatter after we have an initial dot estimate.
-
-    This is deliberately conservative:
-    - marks much shorter than a real dit are treated as glitches
-    - spaces much shorter than a real inter-element gap are merged away
-    - proper ~56-64 ms dits from the clean 700 Hz test remain untouched
-    """
     if len(events) < 3:
         return events
-
     dot = max(20.0, float(dot_ms))
     min_ms = max(12.0, dot * float(fraction))
-
     out: List[Event] = []
     for e in events:
         if e.ms < min_ms:
             if out and out[-1].kind != e.kind:
-                # absorb tiny opposite-state glitch into previous event for now
                 prev = out[-1]
                 out[-1] = Event(prev.kind, prev.ms + e.ms, prev.start_ms, e.end_ms)
             else:
                 out.append(e)
         else:
             out.append(e)
-
-    # Merge adjacent events of same kind after absorption.
     merged: List[Event] = []
     for e in out:
         if merged and merged[-1].kind == e.kind:
@@ -253,19 +237,13 @@ def clean_events_by_dot(events: List[Event], dot_ms: float, fraction: float = 0.
             merged[-1] = Event(prev.kind, prev.ms + e.ms, prev.start_ms, e.end_ms)
         else:
             merged.append(e)
-
-    # One more pass: if a tiny gap remains between two marks, merge the marks.
     changed = True
     while changed and len(merged) >= 3:
         changed = False
         new: List[Event] = []
         i = 0
         while i < len(merged):
-            if (
-                0 < i < len(merged) - 1
-                and merged[i].ms < min_ms
-                and merged[i-1].kind == merged[i+1].kind
-            ):
+            if 0 < i < len(merged) - 1 and merged[i].ms < min_ms and merged[i-1].kind == merged[i+1].kind:
                 prev = merged[i-1]
                 nxt = merged[i+1]
                 combined = Event(prev.kind, prev.ms + merged[i].ms + nxt.ms, prev.start_ms, nxt.end_ms)
@@ -279,65 +257,41 @@ def clean_events_by_dot(events: List[Event], dot_ms: float, fraction: float = 0.
                 new.append(merged[i])
             i += 1
         merged = new
-
     return merged
 
 def estimate_dot_ms(events: List[Event], initial_wpm: Optional[float] = None) -> float:
     default_dot = 1200.0 / float(initial_wpm or 18.75)
-
-    # The original estimator was tuned for medium-speed machine CW and would
-    # fall back to the configured default unless it saw at least three mark
-    # events. At 5 WPM a live window may only contain one or two real marks;
-    # falling back to an 18.75 WPM default makes slow dits look like dahs,
-    # which turns almost everything into haunted TTTTT copy.
-    #
-    # Accept a wider mark range and use the shortest credible marks as the
-    # initial dit estimate. Extremely long single marks are probably dahs, so
-    # do not let those drag the estimate into nonsense.
     marks = np.array([e.ms for e in events if e.kind == "mark" and 35.0 <= e.ms <= 950.0], dtype=np.float32)
     if marks.size == 0:
         return default_dot
-
     marks.sort()
-
-    # One or two marks only: common on very slow CW in a short live buffer.
-    # If the shortest mark is in plausible dit territory, trust it heavily.
-    # A 5 WPM dit is ~240 ms; this keeps that as a dit instead of a dah.
     if marks.size < 3:
         shortest = float(marks[0])
         if 45.0 <= shortest <= 360.0:
             return 0.90 * shortest + 0.10 * default_dot
         return default_dot
-
-    # Lower-duration cluster is usually dits. Use robust lower quantile, then
-    # blend toward configured start. For slow CW, trust the observed timing
-    # more than the default because the default may be much too fast.
     lower_count = max(1, int(math.ceil(marks.size * 0.45)))
     lower = marks[:lower_count]
     med = float(np.median(lower))
-
-    # Avoid mistaking key clicks/noise for dots.
     if med < 45.0:
         med = float(np.percentile(marks, 35))
-
     if 45.0 <= med <= 360.0:
         observed_wpm = 1200.0 / max(1.0, med)
         if observed_wpm <= 10.0:
-            # Slow CW needs minimal bias toward the much faster default.
             return 0.90 * med + 0.10 * default_dot
         return 0.75 * med + 0.25 * default_dot
-
     return default_dot
 
-def decode_events(events: List[Event], dot_ms: float) -> Tuple[str, int, int, List[str]]:
+def decode_events(events: List[Event], dot_ms: float, char_gap_units: float = 2.25, word_gap_units: float = 5.0) -> Tuple[str, int, int, List[str]]:
     chars: List[str] = []
     cur = ""
     decoded = 0
     failed = 0
     symbols_debug: List[str] = []
     dot = max(20.0, float(dot_ms))
+    char_gap = max(1.8, float(char_gap_units))
+    word_gap = max(char_gap + 1.5, float(word_gap_units))
 
-    # Trim leading/trailing spaces; they are buffer artefacts.
     ev = list(events)
     while ev and ev[0].kind == "space":
         ev.pop(0)
@@ -365,11 +319,11 @@ def decode_events(events: List[Event], dot_ms: float) -> Tuple[str, int, int, Li
             else:
                 cur += "-"
         else:
-            if units >= 6.0:
+            if units >= word_gap:
                 flush_char()
                 if chars and chars[-1] != " ":
                     chars.append(" ")
-            elif units >= 2.25:
+            elif units >= char_gap:
                 flush_char()
             else:
                 pass
@@ -429,7 +383,12 @@ def analyse_samples(samples: np.ndarray, config: Dict, tone_override: Optional[s
     if len(events) != len(events_raw):
         dot_ms = 1200.0 / float(wpm_override) if wpm_override else estimate_dot_ms(events, float(config.get("initial_wpm", 18.75)))
     wpm = 1200.0 / max(1.0, dot_ms)
-    raw, decoded, failed, _symbols = decode_events(events, dot_ms)
+    raw, decoded, failed, _symbols = decode_events(
+        events,
+        dot_ms,
+        float(config.get("char_gap_units", 2.25)),
+        float(config.get("word_gap_units", 5.0)),
+    )
     copy = format_copy(raw)
     marks = sum(1 for e in events if e.kind == "mark")
     spaces = sum(1 for e in events if e.kind == "space")
