@@ -43,7 +43,7 @@
   "session_auto_min_ratio": 4.0,
   "session_auto_min_snr": 8.0,
   "char_gap_units": 2.25,
-  "word_gap_units": 6.0,
+  "word_gap_units": 5.3,
   "adaptive_word_gap_enabled": false,
   "adaptive_word_gap_min_units": 5.8,
   "adaptive_word_gap_max_units": 6.4,
